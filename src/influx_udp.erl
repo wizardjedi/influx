@@ -31,7 +31,7 @@ resolve_host(Name) ->
 
 init([TargetHostStr, TargetPort]) ->
 	{ok, Socket} = gen_udp:open(0, [binary, {active,true}]),
-	{ok, TargetHost} = resolve_host(TargetHostStr),
+	TargetHost = resolve_host(TargetHostStr),
 	{ok, #state{
 			socket = Socket,
 			target_host = TargetHost,
