@@ -2,6 +2,7 @@
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([start_link/0, start_link/2, send/2, send/1]).
+-include_lib("kernel/include/inet.hrl").
  
 -record(state, {
 	socket,
@@ -24,9 +25,13 @@ send(Self, Data) ->
 
 % implementation
 
+resolve_host(Name) ->
+   {ok, #hostent{h_addr_list=[Host|_]}} = inet:gethostbyname(Name),
+   Host.
+
 init([TargetHostStr, TargetPort]) ->
 	{ok, Socket} = gen_udp:open(0, [binary, {active,true}]),
-	{ok, TargetHost} = inet_parse:address(TargetHostStr),
+	{ok, TargetHost} = resolve_host(TargetHostStr),
 	{ok, #state{
 			socket = Socket,
 			target_host = TargetHost,
