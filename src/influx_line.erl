@@ -134,7 +134,9 @@ encode(_, _, _, _) -> {error, invalid_data}.
 %% @end
 -spec timestamp() -> Time::non_neg_integer().
 timestamp() ->
-	ulitos:timestamp()*1000000.
+	{Mega, Sec, Micro} = os:timestamp(),
+	T=((Mega * 1000000 + Sec) * 1000000 + Micro) div 1000,
+	T*1000000.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
