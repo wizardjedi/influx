@@ -40,18 +40,15 @@
 %%
 %% @example
 %%   influx_line:encode(
-%%     #{
+%%     {
 %%        measurement => cpu,
-%%        fields => #{ value => 43},
-%%        tags => #{ host => 'eu-west', ip => "127.0.0.1" },
+%%        fields => { value => 43},
+%%        tags => { host => 'eu-west', ip => "127.0.0.1" },
 %%        time => 10000000000
 %%      })
 %%   /=> <<"cpu,host=eu-west,ip="127.0.0.1" value=43 10000000000\n">>
 %% @end
 -spec encode(Points::influx_data_points()) -> Line::binary()|{error, Reason::atom()}.
-encode(#{} = Data) ->
-	encode_with_time(Data, undefined);
-
 encode([{_, _}|_] = Data) ->
 	encode_with_time(Data, undefined);
 
@@ -97,10 +94,10 @@ encode(Name, Fields, Tags) ->
 %%   influx_line:encode(
 %%     cpu,
 %%     [
-%%       #{ value => 43 },
-%%       #{ value => 12 }
+%%       { value => 43 },
+%%       { value => 12 }
 %%     ],
-%%     #{ host => 'eu-west', ip => "127.0.0.1" },
+%%     { host => 'eu-west', ip => "127.0.0.1" },
 %%     1000000000
 %%   )
 %%   /=> <<"cpu,host=eu-west,ip="127.0.0.1" value=43 1000000000\n
@@ -110,10 +107,10 @@ encode(Name, Fields, Tags) ->
 %%   influx_line:encode(
 %%     cpu,
 %%     [
-%%       #{ value => 43 },
-%%       #{ value => 12 }
+%%       { value => 43 },
+%%       { value => 12 }
 %%     ],
-%%     #{ host => 'eu-west', ip => "127.0.0.1" }
+%%     { host => 'eu-west', ip => "127.0.0.1" }
 %%   )
 %%   /=> <<"cpu,host=eu-west,ip="127.0.0.1" value=43\n">>
 %% @end
@@ -123,16 +120,11 @@ encode(Name, Fields, Tags) ->
 	Tags::influx_data_point()|binary(),
 	Time::non_neg_integer()|atom()
 ) -> Line::binary() | {error, Reason::atom()}.
-encode(Name, #{} = Map, Tags, Time) ->
-	encode_item(Name, Map, Tags, Time);
 
 encode(Name, [{_, _}|_] = List, Tags, Time) ->
 	encode_item(Name, List, Tags, Time);
 
 encode(Name, [[{_, _}|_]|_] = Points, Tags, Time) ->
-	encode_list(Name, Points, Tags, Time);
-
-encode(Name, [#{}|_] = Points, Tags, Time) ->
 	encode_list(Name, Points, Tags, Time);
 
 encode(_, _, _, _) -> {error, invalid_data}.
@@ -233,17 +225,6 @@ encode_with_time([{_,_}|_] = List, BaseTime) ->
 		concat_line(Measurement, Tags, Fields, Time)
 	end;
 
-encode_with_time(#{measurement := M, fields := F} = Map, BaseTime) ->
-	Time = encode_time(
-	maps:get(time, Map, BaseTime)
-	),
-	Tags = encode_tags(
-	maps:get(tags, Map, [])
-	),
-	Measurement = to_key(M),
-	Fields = encode_fields(F),
-	concat_line(Measurement, Tags, Fields, Time);
-
 encode_with_time(_, _) -> {error, invalid_data}.
 
 encode_time(undefined) ->
@@ -258,22 +239,12 @@ encode_time(N) ->
 encode_tags(Tags) when is_binary(Tags) ->
 	Tags;
 
-encode_tags(#{} = Map) ->
-	remove_trailing_comma(
-	maps:fold(fun encode_map_tags/3, ?COMMA, Map)
-	);
-
 encode_tags(List) when is_list(List) ->
 	remove_trailing_comma(
 	lists:foldl(fun encode_list_tags/2, ?COMMA, List)
 	);
 
 encode_tags(_) -> ?SPACE.
-
-encode_fields(#{} = Map) ->
-	remove_trailing_comma(
-	maps:fold(fun encode_map_fields/3, ?SPACE, Map)
-	);
 
 encode_fields(List) when is_list(List) ->
 	remove_trailing_comma(
@@ -422,107 +393,10 @@ encode_2_many_proplist_points_test() ->
 	encode("test", [ [{<<"1">>, 1}], [{<<"1">>, 3}] ], [], 1)
 	).
 
-encode_2_map_point_test() ->
-	?assertEqual(
-	<<"test 1=1">>,
-	encode(<<"test">>, #{1 => 1})
-	).
-
-encode_2_many_map_points_test() ->
-	?assertEqual(
-	<<"test 1=1 1\ntest 1=3 2\n">>,
-	encode(<<"test">>, [#{'1' => 1}, #{'1' => 3}], [], 1)
-	).
-
 encode_3_invalid_test() ->
 	?assertEqual(
 	{error, invalid_data},
 	encode(<<"test">>, 'bla-bla', [])
-	).
-
-encode_map_point_test() ->
-	?assertEqual(
-	<<"test,host=eu-west,ip=1.1.1.1 val=10,text=\"hello\" 123">>,
-	encode(
-		#{
-		measurement => <<"test">>,
-		fields => [{"val", 10}, {text, <<"hello">>}],
-		tags => [{host, "eu-west"}, {ip, '1.1.1.1'}],
-		time => 123
-		}
-	)
-	).
-
-encode_proplist_point_test() ->
-	?assertEqual(
-	<<"test,host=eu-west,ip=1.1.1.1 val=10,text=\"hello\" 123">>,
-	encode(
-		[
-		{measurement, <<"test">>},
-		{fields, [{"val", 10}, {text, <<"hello">>}]},
-		{tags, #{host => "eu-west", ip => '1.1.1.1'}},
-		{time, 123}
-		]
-	)
-	).
-
-encode_map_points_test() ->
-	?assertEqual(
-	<<"test val=10 1\ntest2 val=20 2\n">>,
-	encode(
-		[
-		#{
-			measurement => <<"test">>,
-			fields => #{"val" => 10},
-			time => "1"
-		},
-		#{
-			measurement => <<"test2">>,
-			fields => #{"val" => 20},
-			time => <<"2">>
-		}
-		]
-	)
-	).
-
-encode_proplist_points_test() ->
-	?assertEqual(
-	<<"test val=10 1\ntest2 val=20 2\n">>,
-	encode(
-		[
-		[
-			{measurement, <<"test">>},
-			{fields, #{"val" => 10}},
-			{time, 1}
-		],
-		[
-			{measurement, <<"test2">>},
-			{fields, #{"val" => 20}},
-			{time, 2}
-		]
-		]
-	)
-	).
-
-encode_map_without_measurement_test() ->
-	?assertEqual(
-	{error, invalid_data},
-	encode(
-		#{
-		fields => #{ val => 10}
-		}
-	) 
-	).
-
-encode_map_without_fields_test() ->
-	?assertEqual(
-	{error, invalid_data},
-	encode(
-		#{
-		measurement => test,
-		tags => #{ val => 10}
-		}
-	) 
 	).
 
 encode_proplist_without_measurement_test() ->
@@ -533,71 +407,6 @@ encode_proplist_without_measurement_test() ->
 		{fields,  [{val, 10}] }
 		]
 	) 
-	).
-
-encode_proplist_without_fields_test() ->
-	?assertEqual(
-	{error, invalid_data},
-	encode(
-		[
-		{measurement, test},
-		{tags, #{ val => 10}}
-		]
-	) 
-	).
-
-encode_at_least_one_invalid_test() ->
-	?assertEqual(
-	{error, invalid_data},
-	encode(
-		[
-		[
-			{measurement, test},
-			{fields, #{ val => 10}}
-		],
-		[
-			{tags, #{ val => 10}}
-		]
-		]
-	) 
-	).
-
-encode_3_with_proplist_tags_test() ->
-	?assertEqual(
-	<<"test,host=eu-west,ip=1.1.1.1 1=1">>,
-	encode(<<"test">>, #{1 => 1}, [{host, "eu-west"}, {ip, '1.1.1.1'}])
-	).
-
-encode_3_with_map_tags_test() ->
-	?assertEqual(
-	<<"test,host=eu-west,ip=1.1.1.1 1=1">>,
-	encode(<<"test">>, #{1 => 1}, #{host => 'eu-west', ip => <<"1.1.1.1">>})
-	).
-
-encode_3_with_binary_tags_test() ->
-	?assertEqual(
-	<<"test,host=eu-west,ip=1.1.1.1 1=1">>,
-	encode(<<"test">>, #{1 => 1}, <<",host=eu-west,ip=1.1.1.1">>)
-	).
-
-encode_3_many_points_with_tags_test() ->
-	?assertEqual(
-	<<"test,host=eu-west,num=111 memory=\"high\",cpu=20 100\ntest,host=eu-west,num=111 memory=\"low\",cpu=30 101\n">>,
-	encode(
-		<<"test">>,
-		[
-		[{memory, "high"}, {"cpu", 20}],
-		[{<<"memory">>, "low"}, {cpu, 30}]
-		], 
-		#{host => 'eu-west', num => 111},
-		100
-	)
-	).
-
-encode_4_test() ->
-	?assertEqual(
-	<<"test,host=eu-west,ip=1.1.1.1 1=1 123123">>,
-	encode(<<"test">>, #{1 => 1}, [{host, "eu-west"}, {ip, '1.1.1.1'}], 123123)
 	).
 
 encode_4_many_points_test() ->
