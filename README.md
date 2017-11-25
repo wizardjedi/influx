@@ -1,3 +1,5 @@
+It's fork of https://github.com/jamhed/influx repository but with Erlang 16 support.
+
 InfluxDB client
 ---------------
 
